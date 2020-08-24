@@ -8,3 +8,4 @@ EventID Numbers and explanations - #Error, Information, FailureAudit, SuccessAud
     4. Warning 1003 - Entry Type Warning
     
     
+Check the global variables in the script and adjust as needed. Note, this script utlises Invoke-Command with credentials that are pre-created with encrypted AES and Password files. A more secure and elegant solution will be implemented in future revisions.
