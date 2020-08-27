@@ -10,6 +10,6 @@ EventID Numbers and explanations - #Error, Information, FailureAudit, SuccessAud
     
 Check the global variables in the script and adjust as needed. Note, this script utlises Invoke-Command with credentials that are pre-created with encrypted AES and Password files. A more secure and elegant solution will be implemented in future revisions.
 
-Note - The script is expecting your site to have an IP binding, as the command will look for IP --> Protocol and then initiate binding.
+The script will attempt to bind the SSL script to an Assigned IP or Unassigned based on what is configured on the target IIS server (unassigned being 0.0.0.0).
 
 
