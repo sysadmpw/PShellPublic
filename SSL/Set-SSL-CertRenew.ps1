@@ -182,10 +182,8 @@ function Install-SSLCert ($updateSRVCert, $expiredSSLThumbprint) {
             $global:eventSrcMsg = "Binding new SSL Cert: $tempthumb to IIS."
             Write-EventLog -LogName "$global:LogName" -Source "LetsEncryptRenew" -EventID 1000 -EntryType Information -Message $global:eventSrcMsg -Category 1 -RawData 10,20
 
-                     #Check type of binding on target IIS server
-            #Always needs Import-Module WebAdministration
+    #Check type of binding on target IIS server
             $global:sslBindPath = "IIS:\SSlBindings\$updateSRVCert!443"
-
             $scriptBlockParams = @{
                 ComputerName = $updateSRVCert
                 ScriptBlock = { Param ($param1) Import-Module WebAdministration ; Test-Path $param1 }
@@ -194,11 +192,25 @@ function Install-SSLCert ($updateSRVCert, $expiredSSLThumbprint) {
 
             }
             $resultAssigned = Invoke-Command @scriptBlockParams
-            
+
+            #Check if IIS Site not Assigned an IP
+            $global:sslBindPath = "IIS:\SSlBindings\0.0.0.0!443"
+            $scriptBlockParams = @{
+                ComputerName = $updateSRVCert
+                ScriptBlock = { Param ($param1) Import-Module WebAdministration ; Test-Path $param1 }
+                Credential = $global:winRMCredential
+                ArgumentList = "$global:sslBindPath"
+
+            }
+            $resultUnAssigned = Invoke-Command @scriptBlockParams
+
+
+
             #If true, bind by IP, else bind by 0.0.0.0
             if($resultAssigned){
-                Write-host "Site assigned IP to $updateSRVCert" -ForegroundColor Yellow
-               
+                $global:eventSrcMsg = "Server $updateSRVCert IIS Site is Assigned."
+                Write-EventLog -LogName "CMRI" -Source "LetsEncryptRenew" -EventID 1000 -EntryType Information -Message $global:eventSrcMsg -Category 1 -RawData 10,20
+
                 $currentPFX = $global:pfxFileThumbprint.Thumbprint
                 $scriptBlockParamsBind = @{
                     ComputerName = $updateSRVCert
@@ -207,9 +219,9 @@ function Install-SSLCert ($updateSRVCert, $expiredSSLThumbprint) {
                     ArgumentList = "$currentPFX", "$updateSRVCert"
                 }
                 Invoke-Command @scriptBlockParamsBind
-            }else{
-                Write-host "Site not assigned IP on server $updateSRVCert" -ForegroundColor Magenta
-                
+            }elseif ($resultUnAssigned) {
+                $global:eventSrcMsg = "Server $updateSRVCert IIS Site is UnAssigned."
+                Write-EventLog -LogName "CMRI" -Source "LetsEncryptRenew" -EventID 1000 -EntryType Information -Message $global:eventSrcMsg -Category 1 -RawData 10,20                
                 $currentPFX = $global:pfxFileThumbprint.Thumbprint
                 $scriptBlockParamsUBind = @{
                     ComputerName = $updateSRVCert
@@ -218,6 +230,8 @@ function Install-SSLCert ($updateSRVCert, $expiredSSLThumbprint) {
                     ArgumentList = "$currentPFX", "$updateSRVCert"
                 }
                 Invoke-Command @scriptBlockParamsUBind
+            }else{
+                Write-host "Cannot determine binding, returning null" -ForegroundColor Red
             }
 
 
