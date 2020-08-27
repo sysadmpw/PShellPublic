@@ -70,6 +70,10 @@ $global:teamStatusORNG = "FC7E00"
 $global:teamStatus = $null #Set this to RED GRN ORNG variables
 $global:teamStatusTXT = $null
 
+#IIS Binding Configuration
+$global:sslBindPath = $null
+$global:sslUnassignedPath = "IIS:\SSLBindings\0.0.0.0!443"
+
 
 #Encrypted credentials.
 $global:winRMPassContent = $null
@@ -178,15 +182,44 @@ function Install-SSLCert ($updateSRVCert, $expiredSSLThumbprint) {
             $global:eventSrcMsg = "Binding new SSL Cert: $tempthumb to IIS."
             Write-EventLog -LogName "$global:LogName" -Source "LetsEncryptRenew" -EventID 1000 -EntryType Information -Message $global:eventSrcMsg -Category 1 -RawData 10,20
 
-            #Needs Import-Module WebAdministration
-            $currentPFX = $global:pfxFileThumbprint.Thumbprint
+                     #Check type of binding on target IIS server
+            #Always needs Import-Module WebAdministration
+            $global:sslBindPath = "IIS:\SSlBindings\$updateSRVCert!443"
+
             $scriptBlockParams = @{
                 ComputerName = $updateSRVCert
-                ScriptBlock  = { Param ($param1, $param2) Import-Module WebAdministration ; Get-ChildItem Cert:\LocalMachine\My\$param1 | Set-Item "IIS:\SSlBindings\$param2!443" }
-                Credential   = $global:winRMCredential
-                ArgumentList = "$currentPFX", "$updateSRVCert"
+                ScriptBlock = { Param ($param1) Import-Module WebAdministration ; Test-Path $param1 }
+                Credential = $global:winRMCredential
+                ArgumentList = "$global:sslBindPath"
+
             }
-            Invoke-Command @scriptBlockParams
+            $resultAssigned = Invoke-Command @scriptBlockParams
+            
+            #If true, bind by IP, else bind by 0.0.0.0
+            if($resultAssigned){
+                Write-host "Site assigned IP to $updateSRVCert" -ForegroundColor Yellow
+               
+                $currentPFX = $global:pfxFileThumbprint.Thumbprint
+                $scriptBlockParamsBind = @{
+                    ComputerName = $updateSRVCert
+                    ScriptBlock  = { Param ($param1Bind, $param2Bind) Import-Module WebAdministration ; Get-ChildItem Cert:\LocalMachine\My\$param1Bind | Set-Item "IIS:\SSlBindings\$param2Bind!443" }
+                    Credential   = $global:winRMCredential
+                    ArgumentList = "$currentPFX", "$updateSRVCert"
+                }
+                Invoke-Command @scriptBlockParamsBind
+            }else{
+                Write-host "Site not assigned IP on server $updateSRVCert" -ForegroundColor Magenta
+                
+                $currentPFX = $global:pfxFileThumbprint.Thumbprint
+                $scriptBlockParamsUBind = @{
+                    ComputerName = $updateSRVCert
+                    ScriptBlock  = { Param ($param1UBind, $param2UBind) Import-Module WebAdministration ; Get-ChildItem Cert:\LocalMachine\My\$param1UBind | Set-Item "IIS:\SSlBindings\0.0.0.0!443" }
+                    Credential   = $global:winRMCredential
+                    ArgumentList = "$currentPFX", "$updateSRVCert"
+                }
+                Invoke-Command @scriptBlockParamsUBind
+            }
+
 
             #Clean up and remove the PFX file from c:\windows\temp
             $global:eventSrcMsg = "Cleaning up and removing temp PFX file from C:\Windows\temp."
