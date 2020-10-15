@@ -310,11 +310,12 @@ function  Test-LatestPFXFile {
     $expiryDays = (Get-Date).AddDays(30)
     if ($expireAfter -le $expiryDays) {
 
-        $global:eventSrcMsg = "$global:LogName-NGINX SSL Cert is not useable."
+        $global:eventSrcMsg = "$global:LogName-NGINX SSL Cert is not useable. Stopping process."
         Write-EventLog -LogName "$global:LogName" -Source "LetsEncryptRenew" -EventID 1001 -EntryType Error -Message $global:eventSrcMsg -Category 1 -RawData 10,20
         $global:teamSRVTSTHTTPS = "$global:LogName-NGINX"
-        $global:teamStatusTXT = "Problem with PFX file, please investigate"
+        $global:teamStatusTXT = "Problem with PFX file, please investigate. Stopping process."
         Send-TeamsMessage
+        Exit
         return $false
     }
     else {
